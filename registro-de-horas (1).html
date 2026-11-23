@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Registro de Horas</title>
+
+  <!-- ========================================================
+       PARTE 1: CSS (a aparência)
+       O CSS define cores, tamanhos e espaçamentos.
+       Tente mudar as cores abaixo e recarregar a página!
+       ======================================================== -->
+  <style>
+    /* VARIÁVEIS DE COR
+       Em vez de repetir a mesma cor em vários lugares, guardamos
+       cada cor numa variável do CSS ("--nome") e usamos var(--nome).
+       Assim, para mudar o tema basta trocar os valores das variáveis. */
+
+    /* Cores do tema claro (o padrão) */
+    :root {
+      --fundo: #f2f4f8;
+      --caixa: white;
+      --texto: #222;
+      --destaque: #2a5bd7;
+      --destaque-hover: #1f47ac;
+      --texto-botao: white;
+      --borda: #bbb;
+      --linha: #ddd;
+      --campo: white;
+      --suave: #777;
+    }
+
+    /* Cores do tema escuro: valem quando o body tem a classe "escuro" */
+    body.escuro {
+      --fundo: #14171c;
+      --caixa: #1e232b;
+      --texto: #e6e8eb;
+      --destaque: #6c9bff;
+      --destaque-hover: #8ab0ff;
+      --texto-botao: #0b1220;
+      --borda: #444b57;
+      --linha: #333a45;
+      --campo: #14171c;
+      --suave: #9aa3b0;
+      color-scheme: dark; /* deixa os calendários e relógios escuros também */
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: var(--fundo);
+      margin: 0;
+      padding: 20px;
+      color: var(--texto);
+    }
+    .caixa {
+      max-width: 700px;
+      margin: 0 auto 20px auto;
+      background: var(--caixa);
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+    h1 { margin-top: 0; color: var(--destaque); }
+    h2 { margin-top: 0; }
+    label { display: block; margin-top: 10px; font-weight: bold; font-size: 14px; }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      box-sizing: border-box;
+      border: 1px solid var(--borda);
+      background: var(--campo);
+      color: var(--texto);
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    button {
+      margin-top: 15px;
+      padding: 10px 18px;
+      background: var(--destaque);
+      color: var(--texto-botao);
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover { background: var(--destaque-hover); }
+    #botao-tema { float: right; margin: 0; padding: 6px 12px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid var(--linha); }
+    .botao-apagar { margin: 0; padding: 4px 10px; background: #d9534f; font-size: 14px; }
+    .botao-apagar:hover { background: #b52b27; }
+    .total { font-size: 22px; font-weight: bold; margin-top: 15px; color: var(--destaque); }
+    .vazio { color: var(--suave); margin-top: 15px; }
+  </style>
+</head>
+
+<body>
+
+  <!-- ========================================================
+       PARTE 2: HTML (a estrutura)
+       O HTML define o que existe na página: títulos, campos,
+       botões e tabelas. Cada "id" é um nome que o JavaScript
+       usa para encontrar o elemento.
+       ======================================================== -->
+
+  <div class="caixa">
+    <button type="button" id="botao-tema">🌙 Modo escuro</button>
+    <h1>Registro de Horas</h1>
+
+    <h2>Novo registro</h2>
+    <form id="formulario">
+      <label for="data">Data</label>
+      <input type="date" id="data" required>
+
+      <label for="entrada">Hora de entrada</label>
+      <input type="time" id="entrada" required>
+
+      <label for="saida">Hora de saída</label>
+      <input type="time" id="saida" required>
+
+      <label for="intervalo">Intervalo / almoço (em minutos)</label>
+      <input type="number" id="intervalo" value="0" min="0">
+
+      <button type="submit">Salvar registro</button>
+    </form>
+  </div>
+
+  <div class="caixa">
+    <h2>Registros do mês</h2>
+
+    <label for="mes">Escolha o mês</label>
+    <input type="month" id="mes">
+
+    <div id="area-tabela"></div>
+    <div class="total" id="total"></div>
+  </div>
+
+
+  <!-- ========================================================
+       PARTE 3: JavaScript (o comportamento)
+       Aqui está a "inteligência": calcular horas, guardar
+       dados e atualizar a tela.
+       ======================================================== -->
+  <script>
+
+    // ---------- 1. VARIÁVEIS ----------
+    // Uma variável é uma "caixinha" com nome que guarda um valor.
+
+    // Nome da gaveta onde os dados ficam guardados no navegador.
+    const CHAVE = "registro-horas";
+
+    // Lista (array) com todos os registros. Começa com o que já foi salvo antes.
+    let registros = carregar();
+
+    // Pegamos os elementos do HTML pelo "id" para poder mexer neles.
+    const formulario = document.getElementById("formulario");
+    const campoData = document.getElementById("data");
+    const campoEntrada = document.getElementById("entrada");
+    const campoSaida = document.getElementById("saida");
+    const campoIntervalo = document.getElementById("intervalo");
+    const campoMes = document.getElementById("mes");
+    const areaTabela = document.getElementById("area-tabela");
+    const areaTotal = document.getElementById("total");
+
+
+    // ---------- 2. FUNÇÕES ----------
+    // Uma função é um bloco de código com um nome, que podemos
+    // chamar sempre que precisarmos.
+
+    // Lê os registros guardados no navegador (localStorage).
+    function carregar() {
+      try {
+        // Os dados ficam guardados como texto; JSON.parse transforma em lista.
+        return JSON.parse(localStorage.getItem(CHAVE)) || [];
+      } catch (erro) {
+        return [];
+      }
+    }
+
+    // Guarda a lista atual no navegador.
+    function salvar() {
+      // JSON.stringify transforma a lista em texto para poder guardar.
+      localStorage.setItem(CHAVE, JSON.stringify(registros));
+    }
+
+    // Converte "08:30" em minutos desde meia-noite (8*60 + 30 = 510).
+    // Trabalhar com minutos deixa as contas muito mais simples.
+    function paraMinutos(hora) {
+      const partes = hora.split(":");        // "08:30" vira ["08", "30"]
+      const horas = Number(partes[0]);
+      const minutos = Number(partes[1]);
+      return horas * 60 + minutos;
+    }
+
+    // Converte minutos em texto bonito: 510 vira "8h30".
+    function formatarDuracao(totalMinutos) {
+      const horas = Math.floor(totalMinutos / 60);   // parte inteira da divisão
+      const minutos = totalMinutos % 60;             // resto da divisão
+      return horas + "h" + String(minutos).padStart(2, "0");
+    }
+
+    // Converte "2026-11-23" em "23/11/2026".
+    function formatarData(texto) {
+      const partes = texto.split("-");
+      return partes[2] + "/" + partes[1] + "/" + partes[0];
+    }
+
+    // Devolve a data de hoje no formato "2026-11-23".
+    function hojeComoTexto() {
+      const agora = new Date();
+      const ano = agora.getFullYear();
+      const mes = String(agora.getMonth() + 1).padStart(2, "0"); // meses começam em 0!
+      const dia = String(agora.getDate()).padStart(2, "0");
+      return ano + "-" + mes + "-" + dia;
+    }
+
+    // Desenha a tabela e o total na tela.
+    function desenhar() {
+      const mesEscolhido = campoMes.value; // exemplo: "2026-11"
+
+      // filter: fica só com os registros cuja data começa com o mês escolhido.
+      const doMes = registros.filter(function (r) {
+        return r.data.startsWith(mesEscolhido);
+      });
+
+      // sort: coloca em ordem de data (do dia 1 para o último).
+      doMes.sort(function (a, b) {
+        return a.data.localeCompare(b.data);
+      });
+
+      // Se não há registros, mostra um aviso e para por aqui.
+      if (doMes.length === 0) {
+        areaTabela.innerHTML = '<p class="vazio">Nenhum registro neste mês.</p>';
+        areaTotal.textContent = "Total do mês: 0h00";
+        return;
+      }
+
+      // Monta a tabela. A variável "somaMinutos" vai acumulando o total.
+      let somaMinutos = 0;
+      let html = "<table><tr><th>Data</th><th>Entrada</th><th>Saída</th>" +
+                 "<th>Intervalo</th><th>Horas</th><th></th></tr>";
+
+      // Um "laço" (for) repete o mesmo código para cada registro da lista.
+      for (const r of doMes) {
+        somaMinutos = somaMinutos + r.minutos;
+        html += "<tr>" +
+                  "<td>" + formatarData(r.data) + "</td>" +
+                  "<td>" + r.entrada + "</td>" +
+                  "<td>" + r.saida + "</td>" +
+                  "<td>" + r.intervalo + " min</td>" +
+                  "<td>" + formatarDuracao(r.minutos) + "</td>" +
+                  '<td><button class="botao-apagar" onclick="apagar(' + r.id + ')">Apagar</button></td>' +
+                "</tr>";
+      }
+      html += "</table>";
+
+      areaTabela.innerHTML = html;
+      areaTotal.textContent = "Total do mês: " + formatarDuracao(somaMinutos) +
+                              " (" + doMes.length + " dias)";
+    }
+
+    // Apaga um registro pelo seu id.
+    function apagar(id) {
+      if (!confirm("Apagar este registro?")) {
+        return; // se a pessoa clicar em "Cancelar", não faz nada
+      }
+      // Fica com todos os registros, MENOS o que tem esse id.
+      registros = registros.filter(function (r) {
+        return r.id !== id;
+      });
+      salvar();
+      desenhar();
+    }
+
+
+    // ---------- 3. EVENTOS ----------
+    // Um evento é algo que acontece na página (um clique, o envio de
+    // um formulário). Dizemos ao navegador: "quando isso acontecer,
+    // execute esta função".
+
+    formulario.addEventListener("submit", function (evento) {
+      evento.preventDefault(); // impede a página de recarregar ao enviar
+
+      // CONDIÇÃO: o "if" executa um código só se algo for verdadeiro.
+      const entrada = paraMinutos(campoEntrada.value);
+      const saida = paraMinutos(campoSaida.value);
+      const intervalo = Number(campoIntervalo.value);
+      const minutosTrabalhados = saida - entrada - intervalo;
+
+      if (minutosTrabalhados <= 0) {
+        alert("A hora de saída precisa ser depois da entrada (descontando o intervalo).");
+        return;
+      }
+
+      // Cria um "objeto": um conjunto de informações sobre um registro.
+      const novo = {
+        id: Date.now(), // número único baseado no momento atual
+        data: campoData.value,
+        entrada: campoEntrada.value,
+        saida: campoSaida.value,
+        intervalo: intervalo,
+        minutos: minutosTrabalhados
+      };
+
+      registros.push(novo); // adiciona no fim da lista
+      salvar();
+
+      // Mostra o mês do registro que acabou de ser salvo.
+      campoMes.value = novo.data.slice(0, 7);
+      desenhar();
+
+      // Limpa os campos de hora para o próximo registro.
+      campoEntrada.value = "";
+      campoSaida.value = "";
+    });
+
+    // Quando a pessoa troca o mês, redesenha a tabela.
+    campoMes.addEventListener("change", desenhar);
+
+
+    // ---------- 4. MODO ESCURO ----------
+    const botaoTema = document.getElementById("botao-tema");
+
+    // Liga ou desliga o modo escuro.
+    // "classList.toggle" adiciona a classe "escuro" no body se o segundo
+    // valor for true, e remove se for false. O CSS faz o resto.
+    function aplicarTema(escuro) {
+      document.body.classList.toggle("escuro", escuro);
+      botaoTema.textContent = escuro ? "☀️ Modo claro" : "🌙 Modo escuro";
+      try {
+        localStorage.setItem("tema-escuro", escuro ? "1" : "0"); // lembra a escolha
+      } catch (erro) {}
+    }
+
+    // Ao clicar no botão, inverte o tema atual.
+    botaoTema.addEventListener("click", function () {
+      const estaEscuro = document.body.classList.contains("escuro");
+      aplicarTema(!estaEscuro);
+    });
+
+    // Ao abrir a página: usa a escolha salva; se não houver,
+    // segue o tema do seu computador/celular.
+    let temaSalvo = null;
+    try {
+      temaSalvo = localStorage.getItem("tema-escuro");
+    } catch (erro) {}
+
+    if (temaSalvo !== null) {
+      aplicarTema(temaSalvo === "1");
+    } else {
+      aplicarTema(window.matchMedia("(prefers-color-scheme: dark)").matches);
+    }
+
+
+    // ---------- 5. INÍCIO ----------
+    // Isto roda assim que a página abre.
+    campoData.value = hojeComoTexto();
+    campoMes.value = hojeComoTexto().slice(0, 7); // "2026-11"
+    desenhar();
+
+  </script>
+</body>
+</html>
